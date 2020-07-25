@@ -5,12 +5,14 @@
 #
 """ Userbot module containing various scrapers. """
 
+import io
 import os
 import time
 import asyncio
 import shutil
 import re
 import requests
+import urllib
 
 from PIL import Image
 from bs4 import BeautifulSoup
