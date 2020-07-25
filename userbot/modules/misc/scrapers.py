@@ -12,6 +12,7 @@ import shutil
 import re
 import requests
 
+from PIL import Image
 from bs4 import BeautifulSoup
 from html import unescape
 from asyncio import sleep
@@ -45,9 +46,15 @@ from telethon.tl.types import DocumentAttributeAudio
 from userbot.modules.misc.upload_download import progress
 from userbot.utils.google_images_download import googleimagesdownload
 
-CARBONLANG = "auto"
 TTS_LANG = "en"
 TRT_LANG = "en"
+
+opener = urllib.request.build_opener()
+useragent = ('Mozilla/5.0 (Linux; Android 10; SM-G975F) '
+             'AppleWebKit/537.36 (KHTML, like Gecko) '
+             'Chrome/80.0.3987.149 Mobile Safari/537.36'
+             )
+opener.addheaders = [('User-agent', useragent)]
 
 
 @register(outgoing=True, pattern="^\.crblang (.*)")
@@ -57,76 +64,10 @@ async def setlang(prog):
     await prog.edit(f"Language for carbon.now.sh set to {CARBONLANG}")
 
 
-@register(outgoing=True, pattern="^\.carbon")
-async def carbon_api(e):
-    """ A Wrapper for carbon.now.sh """
-    await e.edit("`Processing..`")
-    CARBON = 'https://carbon.now.sh/?l={lang}&code={code}'
-    global CARBONLANG
-    textx = await e.get_reply_message()
-    pcode = e.text
-    if pcode[8:]:
-        pcode = str(pcode[8:])
-    elif textx:
-        pcode = str(textx.message)  # Importing message to module
-    code = quote_plus(pcode)  # Converting to urlencoded
-    await e.edit("`Processing..\n25%`")
-    if os.path.isfile("./carbon.png"):
-        os.remove("./carbon.png")
-    url = CARBON.format(code=code, lang=CARBONLANG)
-    chrome_options = Options()
-    chrome_options.add_argument("--headless")
-    chrome_options.binary_location = GOOGLE_CHROME_BIN
-    chrome_options.add_argument("--window-size=1920x1080")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-gpu")
-    prefs = {'download.default_directory': './'}
-    chrome_options.add_experimental_option('prefs', prefs)
-    driver = webdriver.Chrome(executable_path=CHROME_DRIVER,
-                              options=chrome_options)
-    driver.get(url)
-    await e.edit("`Processing..\n50%`")
-    download_path = './'
-    driver.command_executor._commands["send_command"] = (
-        "POST", '/session/$sessionId/chromium/send_command')
-    params = {
-        'cmd': 'Page.setDownloadBehavior',
-        'params': {
-            'behavior': 'allow',
-            'downloadPath': download_path
-        }
-    }
-    driver.execute("send_command", params)
-    driver.find_element_by_xpath("//button[contains(text(),'Export')]").click()
-    driver.find_element_by_xpath("//button[contains(text(),'4x')]").click()
-    driver.find_element_by_xpath("//button[contains(text(),'PNG')]").click()
-    await e.edit("`Processing..\n75%`")
-    # Waiting for downloading
-    while not os.path.isfile("./carbon.png"):
-        await sleep(0.5)
-    await e.edit("`Processing..\n100%`")
-    file = './carbon.png'
-    await e.edit("`Uploading..`")
-    await e.client.send_file(
-        e.chat_id,
-        file,
-        caption=("Made using [Carbon](https://carbon.now.sh/about/),"
-                 "\na project by [Dawn Labs](https://dawnlabs.io/)"),
-        force_document=True,
-        reply_to=e.message.reply_to_msg_id,
-    )
-
-    os.remove('./carbon.png')
-    driver.quit()
-    # Removing carbon.png after uploading
-    await e.delete()  # Deleting msg
-
-
-@register(outgoing=True, pattern="^\.img (.*)")
+@register(outgoing=True, pattern="^.img (.*)")
 async def img_sampler(event):
     """ For .img command, search and return images matching the query. """
-    await event.edit("`Processing...`")
+    await event.edit("Processing...")
     query = event.pattern_match.group(1)
     lim = findall(r"lim=\d+", query)
     try:
@@ -134,8 +75,8 @@ async def img_sampler(event):
         lim = lim.replace("lim=", "")
         query = query.replace("lim=" + lim[0], "")
     except IndexError:
-        lim = 7
-    response = googleimagesdownload()
+        lim = 2
+    response = google_images_download.googleimagesdownload()
 
     # creating list of arguments
     arguments = {
@@ -150,7 +91,7 @@ async def img_sampler(event):
     lst = paths[0][query]
     await event.client.send_file(
         await event.client.get_input_entity(event.chat_id), lst)
-    shutil.rmtree(os.path.dirname(os.path.abspath(lst[0])))
+    rmtree(os.path.dirname(os.path.abspath(lst[0])))
     await event.delete()
 
 
@@ -715,6 +656,120 @@ async def download_video(v_url):
         await v_url.delete()
 
 
+@register(outgoing=True, pattern=r"^.reverse(?: |$)(\d*)")
+async def okgoogle(img):
+    """ For .reverse command, Google search images and stickers. """
+    if os.path.isfile("okgoogle.png"):
+        os.remove("okgoogle.png")
+
+    message = await img.get_reply_message()
+    if message and message.media:
+        photo = io.BytesIO()
+        await bot.download_media(message, photo)
+    else:
+        return await img.edit("`Reply to photo or sticker nigger.`")
+
+    if photo:
+        await img.edit("`Processing...`")
+        try:
+            image = Image.open(photo)
+        except OSError:
+            return await img.edit('`Unsupported sexuality, most likely.`')
+        name = "okgoogle.png"
+        image.save(name, "PNG")
+        image.close()
+        # https://stackoverflow.com/questions/23270175/google-reverse-image-search-using-post-request#28792943
+        searchUrl = 'https://www.google.com/searchbyimage/upload'
+        multipart = {
+            'encoded_image': (name, open(name, 'rb')),
+            'image_content': ''
+        }
+        response = requests.post(searchUrl,
+                                 files=multipart,
+                                 allow_redirects=False)
+        fetchUrl = response.headers['Location']
+
+        if response != 400:
+            await img.edit("`Image successfully uploaded to Google. Maybe.`"
+                           "\n`Parsing source now. Maybe.`")
+        else:
+            return await img.edit("`Google told me to fuck off.`")
+
+        os.remove(name)
+        match = await ParseSauce(fetchUrl +
+                                 "&preferences?hl=en&fg=1#languages")
+        guess = match['best_guess']
+        imgspage = match['similar_images']
+
+        if guess and imgspage:
+            await img.edit(f"[{guess}]({fetchUrl})\n\n`Looking for images...`")
+        else:
+            return await img.edit("`Couldn't find anything for your uglyass.`")
+
+        if img.pattern_match.group(1):
+            lim = img.pattern_match.group(1)
+        else:
+            lim = 3
+        images = await scam(match, lim)
+        yeet = []
+        for i in images:
+            k = requests.get(i)
+            yeet.append(k.content)
+        try:
+            await img.client.send_file(entity=await
+                                       img.client.get_input_entity(img.chat_id
+                                                                   ),
+                                       file=yeet,
+                                       reply_to=img)
+        except TypeError:
+            pass
+        await img.edit(
+            f"[{guess}]({fetchUrl})\n\n[Visually similar images]({imgspage})")
+
+
+async def ParseSauce(googleurl):
+    """Parse/Scrape the HTML code for the info we want."""
+
+    source = opener.open(googleurl).read()
+    soup = BeautifulSoup(source, 'html.parser')
+
+    results = {'similar_images': '', 'best_guess': ''}
+
+    try:
+        for similar_image in soup.findAll('input', {'class': 'gLFyf'}):
+            url = 'https://www.google.com/search?tbm=isch&q=' + \
+                urllib.parse.quote_plus(similar_image.get('value'))
+            results['similar_images'] = url
+    except BaseException:
+        pass
+
+    for best_guess in soup.findAll('div', attrs={'class': 'r5a77d'}):
+        results['best_guess'] = best_guess.get_text()
+
+    return results
+
+
+async def scam(results, lim):
+
+    single = opener.open(results['similar_images']).read()
+    decoded = single.decode('utf-8')
+
+    imglinks = []
+    counter = 0
+
+    pattern = r'^,\[\"(.*[.png|.jpg|.jpeg])\",[0-9]+,[0-9]+\]$'
+    oboi = re.findall(pattern, decoded, re.I | re.M)
+
+    for imglink in oboi:
+        counter += 1
+        if not counter >= int(lim):
+            imglinks.append(imglink)
+        else:
+            break
+
+    return imglinks
+
+
 def deEmojify(inputString):
     """ Remove emojis and other non-safe characters from string """
     return get_emoji_regexp().sub(u'', inputString)
@@ -730,10 +785,6 @@ add_help_item(
 
     `.currency <amount> <from> <to>`
     **Usage:** Converts various currencies for you.
-
-    `.carbon <text> [or reply]`
-    **Usage:** Beautify your code using carbon.now.sh
-    Use `.crblang <text>` to set language for your code.
 
     `.google <query>`
     **Usage:** Does a search on Google.
@@ -764,5 +815,8 @@ add_help_item(
     `.ripaudio <url> or ripvideo <url>`
     **Usage:** Download videos and songs from YouTube 
     (and [many other sites](https://ytdl-org.github.io/youtube-dl/supportedsites.html)).
+    
+    `.reverse`
+    **Usage:** Reply to a pic/sticker to revers-search it on Google Images.
     """
 )
