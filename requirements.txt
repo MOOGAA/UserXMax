@@ -46,3 +46,4 @@ urbandict
 git+https://github.com/johnwmillr/LyricsGenius.git
 python-magic
 telegraph
+google_images_download
