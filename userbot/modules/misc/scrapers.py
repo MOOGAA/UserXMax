@@ -46,7 +46,7 @@ from userbot import (BOTLOG, BOTLOG_CHATID, YOUTUBE_API_KEY,
 from userbot.events import register
 from telethon.tl.types import DocumentAttributeAudio
 from userbot.modules.misc.upload_download import progress
-from userbot.utils.google_images_download import googleimagesdownload
+from google_images_download import google_images_download
 
 TTS_LANG = "en"
 TRT_LANG = "en"
@@ -57,13 +57,6 @@ useragent = ('Mozilla/5.0 (Linux; Android 10; SM-G975F) '
              'Chrome/80.0.3987.149 Mobile Safari/537.36'
              )
 opener.addheaders = [('User-agent', useragent)]
-
-
-@register(outgoing=True, pattern="^\.crblang (.*)")
-async def setlang(prog):
-    global CARBONLANG
-    CARBONLANG = prog.pattern_match.group(1)
-    await prog.edit(f"Language for carbon.now.sh set to {CARBONLANG}")
 
 
 @register(outgoing=True, pattern="^.img (.*)")
